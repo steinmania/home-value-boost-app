@@ -1,7 +1,7 @@
 
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { PROPERTIES, CURRENT_USER, getDefaultProperty } from "@/lib/data";
+import { PROPERTIES, CURRENT_USER, getDefaultProperty, getLogsForProperty, getRemindersForProperty } from "@/lib/data";
 import { NavBar } from "@/components/NavBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -57,6 +57,10 @@ export default function Dashboard() {
   }, [properties.map(p => p.address).join(",")]);
 
   const title = isPremium && properties.length > 1 ? "My properties" : "My property";
+
+  // Get logs and reminders for selected property
+  const logsForProperty = getLogsForProperty(selectedProperty?.id || "");
+  const remindersForProperty = getRemindersForProperty(selectedProperty?.id || "");
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -199,7 +203,7 @@ export default function Dashboard() {
               />
             ) : (
               // Only show logs/reminders for selected property
-              (require("@/lib/data").getLogsForProperty(selectedProperty.id)).length === 0 ? (
+              logsForProperty.length === 0 ? (
                 <EmptyState
                   icon={<History className="h-12 w-12 opacity-50" />}
                   title="No maintenance logs yet"
@@ -215,15 +219,13 @@ export default function Dashboard() {
                   }
                 />
               ) : (
-                require("@/lib/data")
-                  .getLogsForProperty(selectedProperty.id)
-                  .map(log => (
-                    <MaintenanceLogItem
-                      key={log.id}
-                      log={log}
-                      onClick={() => toast.info("Task details view coming soon!")}
-                    />
-                  ))
+                logsForProperty.map(log => (
+                  <MaintenanceLogItem
+                    key={log.id}
+                    log={log}
+                    onClick={() => toast.info("Task details view coming soon!")}
+                  />
+                ))
               )
             )}
           </TabsContent>
@@ -246,8 +248,7 @@ export default function Dashboard() {
                 }
               />
             ) : (
-              (require("@/lib/data")
-                .getRemindersForProperty(selectedProperty.id)).length === 0 ? (
+              remindersForProperty.length === 0 ? (
                 <EmptyState
                   icon={<Calendar className="h-12 w-12 opacity-50" />}
                   title="No reminders set"
@@ -263,11 +264,9 @@ export default function Dashboard() {
                   }
                 />
               ) : (
-                require("@/lib/data")
-                  .getRemindersForProperty(selectedProperty.id)
-                  .map(reminder => (
-                    <ReminderItem key={reminder.id} reminder={reminder} />
-                  ))
+                remindersForProperty.map(reminder => (
+                  <ReminderItem key={reminder.id} reminder={reminder} />
+                ))
               )
             )}
           </TabsContent>

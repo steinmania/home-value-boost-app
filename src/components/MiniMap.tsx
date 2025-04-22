@@ -38,8 +38,8 @@ export const MiniMap: React.FC<MiniMapProps> = ({
     <div className="rounded-lg shadow border overflow-hidden" style={{ height }}>
       <MapContainer
         className="h-full w-full"
-        center={position}
-        zoom={zoom}
+        defaultCenter={position}
+        defaultZoom={zoom}
         scrollWheelZoom={false}
         attributionControl={false}
         dragging={false}
