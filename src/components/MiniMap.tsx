@@ -5,10 +5,13 @@ import "leaflet/dist/leaflet.css";
 
 // Avoid missing marker icon issue in leaflet/react-leaflet
 import L from "leaflet";
-const markerIcon = new L.Icon({
+
+// Fix for default marker icon issue in Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
 interface MiniMapProps {
@@ -18,6 +21,7 @@ interface MiniMapProps {
   height?: number;
   zoom?: number;
 }
+
 export const MiniMap: React.FC<MiniMapProps> = ({
   lat,
   lon,
@@ -26,26 +30,26 @@ export const MiniMap: React.FC<MiniMapProps> = ({
   zoom = 15,
 }) => {
   if (!lat || !lon) return null;
+  
+  const position: [number, number] = [lat, lon];
 
   return (
     <div className="rounded-lg shadow border overflow-hidden" style={{ height }}>
       <MapContainer
-        center={[lat, lon]}
+        center={position}
         zoom={zoom}
         scrollWheelZoom={false}
         style={{ height: "100%", width: "100%" }}
         attributionControl={false}
         dragging={false}
         doubleClickZoom={false}
-        boxZoom={false}
-        keyboard={false}
-        tap={false}
-        touchZoom={false}
+        zoomControl={false}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
-        <Marker position={[lat, lon]} icon={markerIcon}>
+        <Marker position={position}>
           {label && <Popup>{label}</Popup>}
         </Marker>
       </MapContainer>
