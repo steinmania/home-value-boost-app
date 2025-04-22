@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo";
@@ -9,7 +10,7 @@ import { toast } from "sonner";
 import { updateHome, addProperty, PROPERTIES, CURRENT_USER } from "@/lib/data";
 import { useAddressAutocomplete, AddressSuggestion } from "@/hooks/useAddressAutocomplete";
 import { MiniMap } from "@/components/MiniMap";
-import { MapPin, SearchIcon } from "lucide-react";
+import { MapPin } from "lucide-react";
 
 const COUNTRIES = [
   { code: "us", name: "United States" },
@@ -33,13 +34,15 @@ export default function Setup() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionRef = useRef<HTMLUListElement>(null);
-  const { suggestions, loading, search, clear } = useAddressAutocomplete();
+  
+  const { suggestions, loading, search, clear, error } = useAddressAutocomplete();
 
   const isPremium = CURRENT_USER.subscription === "Premium";
   const canAddMore = isPremium || PROPERTIES.length === 0;
 
+  // Handle clicks outside the suggestion dropdown
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    function handleClickOutside(event: MouseEvent) {
       if (
         suggestionRef.current && 
         !suggestionRef.current.contains(event.target as Node) &&
@@ -48,86 +51,94 @@ export default function Setup() {
       ) {
         setShowSuggestions(false);
       }
-    };
+    }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Handle address input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setRawInput(val);
     setSelected(null);
-    setShowSuggestions(true);
-    search(val, country);
+    
+    if (val.length >= 3) {
+      setShowSuggestions(true);
+      search(val, country);
+    } else {
+      clear();
+      setShowSuggestions(false);
+    }
   };
 
+  // Handle country selection changes
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newCountry = e.target.value;
     setCountry(newCountry);
-    setSelected(null);
+    
     if (rawInput && rawInput.length >= 3) {
       search(rawInput, newCountry);
     }
   };
 
+  // Handle suggestion selection
   const handleSuggestionClick = (s: AddressSuggestion) => {
     setRawInput(s.label);
     setSelected(s);
     setShowSuggestions(false);
-    clear();
-    setTimeout(() => {
-      inputRef.current?.blur();
-    }, 100);
   };
 
+  // Handle property name changes
   const handlePropertyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPropertyName(e.target.value);
   };
 
+  // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!propertyName.trim()) {
+      toast.error("Property name is required");
+      return;
+    }
+    
     setIsSubmitting(true);
 
-    if (!propertyName.trim()) {
-      toast.error("Property name is required.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (selected) {
+    try {
       if (PROPERTIES.length === 0) {
-        updateHome(selected.label, propertyName.trim());
-      } else {
-        const added = addProperty(selected.label, propertyName.trim());
-        if (!added) {
-          toast.error("You must upgrade to add more than one property.");
-          setIsSubmitting(false);
-          return;
+        // First property (free tier)
+        updateHome(
+          selected ? selected.label : null, 
+          propertyName.trim()
+        );
+        
+        toast.success("Property added successfully!");
+      } else if (isPremium) {
+        // Additional property (premium tier)
+        const added = addProperty(
+          selected ? selected.label : null,
+          propertyName.trim()
+        );
+        
+        if (added) {
+          toast.success("Additional property added!");
+        } else {
+          toast.error("Failed to add property");
         }
-      }
-    } else if (rawInput.trim().length > 0) {
-      toast.error("Please select a verified address from suggestions.");
-      setIsSubmitting(false);
-      return;
-    } else {
-      if (PROPERTIES.length === 0) {
-        updateHome(null, propertyName.trim());
       } else {
-        const added = addProperty(null, propertyName.trim());
-        if (!added) {
-          toast.error("You must upgrade to add more than one property.");
-          setIsSubmitting(false);
-          return;
-        }
+        // Free tier user trying to add more than one property
+        toast.error("You need to upgrade to Premium to add more properties");
       }
-    }
-
-    setTimeout(() => {
-      setIsSubmitting(false);
-      toast.success("Property added!");
+      
+      // Navigate to dashboard after successful submission
       navigate("/dashboard");
-    }, 800);
+    } catch (error) {
+      console.error("Error adding property:", error);
+      toast.error("Failed to add property. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -137,7 +148,9 @@ export default function Setup() {
           <Logo className="mb-2" />
           <h1 className="text-2xl font-bold">Welcome to Zing!</h1>
           <p className="text-muted-foreground text-center mt-1">
-            Let's set up your home
+            {PROPERTIES.length === 0 
+              ? "Let's set up your first property" 
+              : "Add another property to your portfolio"}
           </p>
         </div>
 
@@ -149,13 +162,14 @@ export default function Setup() {
           </CardHeader>
           <form onSubmit={handleSubmit} autoComplete="off">
             <CardContent className="space-y-4">
+              {/* Property Name Field */}
               <div className="space-y-2">
                 <Label htmlFor="propertyName" className="text-base font-medium">
                   Property Name
                 </Label>
                 <Input
                   id="propertyName"
-                  placeholder="E.g. Lake House, Main House"
+                  placeholder="E.g. Lake House, Main Home"
                   value={propertyName}
                   onChange={handlePropertyNameChange}
                   maxLength={40}
@@ -163,10 +177,11 @@ export default function Setup() {
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Choose a custom name for this property.
+                  Choose a custom name for this property
                 </p>
               </div>
 
+              {/* Country Selection */}
               <div className="space-y-2">
                 <Label htmlFor="country" className="text-base font-medium">
                   Country
@@ -185,21 +200,17 @@ export default function Setup() {
                 </select>
               </div>
 
+              {/* Address Field */}
               <div className="space-y-2">
                 <Label htmlFor="address" className="text-base font-medium">
                   Address <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
                 </Label>
                 <div className="relative">
+                  {/* Address Input Field */}
                   <div 
                     className={`flex items-center border rounded-md bg-background px-3 transition ${
                       showSuggestions ? "border-zing-500 ring-2 ring-zing-500" : "border-zing-300"
                     }`}
-                    onClick={() => {
-                      inputRef.current?.focus();
-                      if (rawInput.length >= 3) {
-                        setShowSuggestions(true);
-                      }
-                    }}
                   >
                     {loading ? (
                       <div className="h-5 w-5 rounded-full border-2 border-zing-500 border-t-transparent animate-spin mr-2" />
@@ -223,6 +234,8 @@ export default function Setup() {
                       style={{ boxShadow: "none" }}
                     />
                   </div>
+                  
+                  {/* Address Suggestions Dropdown */}
                   {showSuggestions && (
                     <ul 
                       ref={suggestionRef}
@@ -235,7 +248,7 @@ export default function Setup() {
                       )}
                       {!loading && suggestions.length === 0 && rawInput.length >= 3 && (
                         <li className="p-3 text-sm text-muted-foreground">
-                          No matches found. Try a different search.
+                          {error || "No matches found. Try a different search."}
                         </li>
                       )}
                       {suggestions.map((s, i) => (
@@ -251,10 +264,14 @@ export default function Setup() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Start typing and select your verified address from the list. Suggestions are limited to your country.
+                  Start typing and select your verified address from the list.
                 </p>
+                {error && (
+                  <p className="text-xs text-red-500 mt-1">{error}</p>
+                )}
               </div>
 
+              {/* Selected Address Preview */}
               {selected && (
                 <div className="mt-2">
                   <div className="bg-zing-50 p-2 rounded-md border border-zing-100">
@@ -266,19 +283,27 @@ export default function Setup() {
               )}
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
+              {/* Submit Button */}
               <Button
                 type="submit"
                 className="w-full bg-zing-600 hover:bg-zing-700"
                 disabled={isSubmitting || !canAddMore}
               >
-                {isSubmitting ? "Adding..." : (PROPERTIES.length === 0 ? "Continue to Dashboard" : "Add Property")}
+                {isSubmitting 
+                  ? "Adding..." 
+                  : (PROPERTIES.length === 0 
+                    ? "Continue to Dashboard" 
+                    : "Add Property")}
               </Button>
+              
+              {/* Premium Upgrade Note */}
               {!canAddMore && (
                 <div className="text-sm text-center text-zing-500">
                   Upgrade to Premium to add more properties!
                 </div>
               )}
 
+              {/* Skip/Return Button */}
               <Button
                 type="button"
                 variant="ghost"

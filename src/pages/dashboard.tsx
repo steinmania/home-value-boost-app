@@ -1,11 +1,11 @@
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { PROPERTIES, CURRENT_USER, getDefaultProperty, getLogsForProperty, getRemindersForProperty } from "@/lib/data";
+import { PROPERTIES, CURRENT_USER, getLogsForProperty, getRemindersForProperty } from "@/lib/data";
 import { NavBar } from "@/components/NavBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, History, Calendar, Home, Map } from "lucide-react";
+import { Plus, History, Calendar, Home } from "lucide-react";
 import { MaintenanceLogItem } from "@/components/MaintenanceLogItem";
 import { ReminderItem } from "@/components/ReminderItem";
 import { EmptyState } from "@/components/EmptyState";
@@ -14,8 +14,8 @@ import { toast } from "sonner";
 import { MiniMap } from "@/components/MiniMap";
 import { MiniStreetView } from "@/components/MiniStreetView";
 
-// Helper to fetch lat/lon for the current home address
-async function geocodeAddress(address: string): Promise<{ lat: number; lon: number } | null> {
+// Helper to fetch lat/lon for an address
+const geocodeAddress = async (address: string): Promise<{ lat: number; lon: number } | null> => {
   if (!address) return null;
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
@@ -25,42 +25,48 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lon: numb
     const data = await res.json();
     if (!data[0]) return null;
     return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-  } catch {
+  } catch (error) {
+    console.error("Error geocoding address:", error);
     return null;
   }
-}
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>("history");
-  // Track selected property (for Premium with multiple)
+  
+  // Properties and selection state
   const properties = PROPERTIES;
   const isPremium = CURRENT_USER.subscription === "Premium";
   const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id);
+  
+  // Map locations state
+  const [mapLocations, setMapLocations] = useState<{ [propertyId: string]: { lat: number; lon: number } | null }>({});
 
   // Property being viewed
   const selectedProperty = properties.find(p => p.id === selectedPropertyId) || properties[0];
-
-  // Map locations for all properties
-  const [mapLocations, setMapLocations] = useState<{ [propertyId: string]: { lat: number; lon: number } | null }>({});
-  useMemo(() => {
-    async function loadLocations() {
-      for (const prop of properties) {
-        if (prop.address && !mapLocations[prop.id]) {
-          const coords = await geocodeAddress(prop.address);
-          setMapLocations(loc => ({ ...loc, [prop.id]: coords }));
-        }
-      }
-    }
-    loadLocations();
-    // eslint-disable-next-line
-  }, [properties.map(p => p.address).join(",")]);
-
+  
+  // Title based on number of properties
   const title = isPremium && properties.length > 1 ? "My properties" : "My property";
 
   // Get logs and reminders for selected property
   const logsForProperty = getLogsForProperty(selectedProperty?.id || "");
   const remindersForProperty = getRemindersForProperty(selectedProperty?.id || "");
+
+  // Load map locations when properties change
+  useEffect(() => {
+    async function loadLocations() {
+      for (const prop of properties) {
+        if (prop.address && !mapLocations[prop.id]) {
+          const coords = await geocodeAddress(prop.address);
+          if (coords) {
+            setMapLocations(prev => ({ ...prev, [prop.id]: coords }));
+          }
+        }
+      }
+    }
+    loadLocations();
+  }, [properties]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -87,9 +93,10 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* Show property cards if multiple (Premium), or single card if one */}
+        {/* Property display section */}
         <div className="mb-4">
           {isPremium && properties.length > 1 ? (
+            // Multiple properties display (Premium)
             <div>
               <div className="mb-2 font-medium">My Properties:</div>
               <div className="flex flex-wrap gap-3">
@@ -99,20 +106,24 @@ export default function Dashboard() {
                     className={`rounded-md border border-zing-200 p-3 cursor-pointer shadow transition hover:shadow-md bg-white flex flex-col items-center w-52 ${selectedPropertyId === p.id ? "ring-2 ring-zing-600" : ""}`}
                     onClick={() => setSelectedPropertyId(p.id)}
                   >
-                    <MiniStreetView address={p.address || ""} />
+                    <MiniStreetView 
+                      address={p.address || ""} 
+                      width={120}
+                      height={80}
+                    />
                     <div className="mt-2 text-sm font-semibold text-zing-700">{p.name}</div>
                     <div className="text-xs text-muted-foreground line-clamp-2 text-center">{p.address || "No address set"}</div>
-                    <div className="mt-1">
-                      {mapLocations[p.id] && p.address && (
+                    {mapLocations[p.id] && (
+                      <div className="mt-1 w-full">
                         <MiniMap
                           lat={mapLocations[p.id]?.lat as number}
                           lon={mapLocations[p.id]?.lon as number}
-                          label={p.address}
+                          label={p.address || ""}
                           height={80}
                           zoom={15}
                         />
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -122,20 +133,24 @@ export default function Dashboard() {
             <div>
               <div className="mb-2 font-medium">My Property:</div>
               <div className="rounded-md border border-zing-200 p-3 bg-white flex flex-col items-center w-72">
-                <MiniStreetView address={selectedProperty.address || ""} />
-                <div className="mt-2 text-sm font-semibold text-zing-700">{selectedProperty.name}</div>
-                <div className="text-xs text-muted-foreground line-clamp-2 text-center">{selectedProperty.address || "No address set"}</div>
-                <div className="mt-1">
-                  {mapLocations[selectedProperty.id] && selectedProperty.address && (
+                <MiniStreetView 
+                  address={selectedProperty?.address || ""} 
+                  width={160}
+                  height={100}
+                />
+                <div className="mt-2 text-sm font-semibold text-zing-700">{selectedProperty?.name}</div>
+                <div className="text-xs text-muted-foreground line-clamp-2 text-center">{selectedProperty?.address || "No address set"}</div>
+                {selectedProperty?.address && mapLocations[selectedProperty?.id] && (
+                  <div className="mt-1 w-full">
                     <MiniMap
-                      lat={mapLocations[selectedProperty.id]?.lat as number}
-                      lon={mapLocations[selectedProperty.id]?.lon as number}
-                      label={selectedProperty.address}
+                      lat={mapLocations[selectedProperty?.id]?.lat as number}
+                      lon={mapLocations[selectedProperty?.id]?.lon as number}
+                      label={selectedProperty?.address}
                       height={80}
                       zoom={15}
                     />
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -143,6 +158,7 @@ export default function Dashboard() {
 
         <ValueDisplay />
 
+        {/* Maintenance section */}
         <div className="mt-6 flex items-center justify-between">
           <h2 className="text-lg font-medium">Your Maintenance</h2>
 
@@ -168,6 +184,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Task history tabs */}
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -184,9 +201,10 @@ export default function Dashboard() {
             </TabsTrigger>
           </TabsList>
 
+          {/* History content */}
           <TabsContent value="history" className="mt-4 space-y-4">
             {(!selectedProperty || !selectedProperty.id) ||
-            (PROPERTIES.length === 0) ? (
+            (properties.length === 0) ? (
               <EmptyState
                 icon={<History className="h-12 w-12 opacity-50" />}
                 title="No maintenance logs yet"
@@ -202,7 +220,6 @@ export default function Dashboard() {
                 }
               />
             ) : (
-              // Only show logs/reminders for selected property
               logsForProperty.length === 0 ? (
                 <EmptyState
                   icon={<History className="h-12 w-12 opacity-50" />}
@@ -223,16 +240,17 @@ export default function Dashboard() {
                   <MaintenanceLogItem
                     key={log.id}
                     log={log}
-                    onClick={() => toast.info("Task details view coming soon!")}
+                    onClick={() => navigate(`/task/${log.id}`)}
                   />
                 ))
               )
             )}
           </TabsContent>
 
+          {/* Reminders content */}
           <TabsContent value="reminders" className="mt-4 space-y-4">
             {(!selectedProperty || !selectedProperty.id) ||
-            (PROPERTIES.length === 0) ? (
+            (properties.length === 0) ? (
               <EmptyState
                 icon={<Calendar className="h-12 w-12 opacity-50" />}
                 title="No reminders set"
