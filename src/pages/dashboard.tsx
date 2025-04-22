@@ -1,17 +1,18 @@
 
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { HOME, MAINTENANCE_LOGS, REMINDERS } from "@/lib/data";
+import { PROPERTIES, CURRENT_USER, getDefaultProperty } from "@/lib/data";
 import { NavBar } from "@/components/NavBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, History, Calendar, Home } from "lucide-react";
+import { Plus, History, Calendar, Home, Map } from "lucide-react";
 import { MaintenanceLogItem } from "@/components/MaintenanceLogItem";
 import { ReminderItem } from "@/components/ReminderItem";
 import { EmptyState } from "@/components/EmptyState";
 import { ValueDisplay } from "@/components/ValueDisplay";
 import { toast } from "sonner";
 import { MiniMap } from "@/components/MiniMap";
+import { MiniStreetView } from "@/components/MiniStreetView";
 
 // Helper to fetch lat/lon for the current home address
 async function geocodeAddress(address: string): Promise<{ lat: number; lon: number } | null> {
@@ -32,16 +33,30 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lon: numb
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>("history");
-  const [mapLocation, setMapLocation] = useState<{ lat: number; lon: number } | null>(null);
+  // Track selected property (for Premium with multiple)
+  const properties = PROPERTIES;
+  const isPremium = CURRENT_USER.subscription === "Premium";
+  const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id);
 
-  // When address changes, update lat/lon
+  // Property being viewed
+  const selectedProperty = properties.find(p => p.id === selectedPropertyId) || properties[0];
+
+  // Map locations for all properties
+  const [mapLocations, setMapLocations] = useState<{ [propertyId: string]: { lat: number; lon: number } | null }>({});
   useMemo(() => {
-    if (HOME.address) {
-      geocodeAddress(HOME.address).then(setMapLocation);
-    } else {
-      setMapLocation(null);
+    async function loadLocations() {
+      for (const prop of properties) {
+        if (prop.address && !mapLocations[prop.id]) {
+          const coords = await geocodeAddress(prop.address);
+          setMapLocations(loc => ({ ...loc, [prop.id]: coords }));
+        }
+      }
     }
-  }, [HOME.address]);
+    loadLocations();
+    // eslint-disable-next-line
+  }, [properties.map(p => p.address).join(",")]);
+
+  const title = isPremium && properties.length > 1 ? "My properties" : "My property";
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -53,9 +68,9 @@ export default function Dashboard() {
             <h1 className="text-2xl font-bold">
               Home Maintenance Tracker
             </h1>
-            {HOME.address && (
-              <p className="text-muted-foreground">{HOME.address}</p>
-            )}
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold">{title}</span>
+            </div>
           </div>
 
           <Button
@@ -68,17 +83,59 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* MiniMap for user's address */}
-        {HOME.address && mapLocation && (
-          <div className="mb-4">
-            <MiniMap
-              lat={mapLocation.lat}
-              lon={mapLocation.lon}
-              label={HOME.address}
-              height={180}
-            />
-          </div>
-        )}
+        {/* Show property cards if multiple (Premium), or single card if one */}
+        <div className="mb-4">
+          {isPremium && properties.length > 1 ? (
+            <div>
+              <div className="mb-2 font-medium">My Properties:</div>
+              <div className="flex flex-wrap gap-3">
+                {properties.map((p) => (
+                  <div
+                    key={p.id}
+                    className={`rounded-md border border-zing-200 p-3 cursor-pointer shadow transition hover:shadow-md bg-white flex flex-col items-center w-52 ${selectedPropertyId === p.id ? "ring-2 ring-zing-600" : ""}`}
+                    onClick={() => setSelectedPropertyId(p.id)}
+                  >
+                    <MiniStreetView address={p.address || ""} />
+                    <div className="mt-2 text-sm font-semibold text-zing-700">{p.name}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-2 text-center">{p.address || "No address set"}</div>
+                    <div className="mt-1">
+                      {mapLocations[p.id] && p.address && (
+                        <MiniMap
+                          lat={mapLocations[p.id]?.lat as number}
+                          lon={mapLocations[p.id]?.lon as number}
+                          label={p.address}
+                          height={80}
+                          zoom={15}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            // Single property view
+            <div>
+              <div className="mb-2 font-medium">My Property:</div>
+              <div className="rounded-md border border-zing-200 p-3 bg-white flex flex-col items-center w-72">
+                <MiniStreetView address={selectedProperty.address || ""} />
+                <div className="mt-2 text-sm font-semibold text-zing-700">{selectedProperty.name}</div>
+                <div className="text-xs text-muted-foreground line-clamp-2 text-center">{selectedProperty.address || "No address set"}</div>
+                <div className="mt-1">
+                  {mapLocations[selectedProperty.id] && selectedProperty.address && (
+                    <MiniMap
+                      lat={mapLocations[selectedProperty.id]?.lat as number}
+                      lon={mapLocations[selectedProperty.id]?.lon as number}
+                      label={selectedProperty.address}
+                      height={80}
+                      zoom={15}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         <ValueDisplay />
 
@@ -124,7 +181,8 @@ export default function Dashboard() {
           </TabsList>
 
           <TabsContent value="history" className="mt-4 space-y-4">
-            {MAINTENANCE_LOGS.length === 0 ? (
+            {(!selectedProperty || !selectedProperty.id) ||
+            (PROPERTIES.length === 0) ? (
               <EmptyState
                 icon={<History className="h-12 w-12 opacity-50" />}
                 title="No maintenance logs yet"
@@ -140,18 +198,39 @@ export default function Dashboard() {
                 }
               />
             ) : (
-              MAINTENANCE_LOGS.map(log => (
-                <MaintenanceLogItem
-                  key={log.id}
-                  log={log}
-                  onClick={() => toast.info("Task details view coming soon!")}
+              // Only show logs/reminders for selected property
+              (require("@/lib/data").getLogsForProperty(selectedProperty.id)).length === 0 ? (
+                <EmptyState
+                  icon={<History className="h-12 w-12 opacity-50" />}
+                  title="No maintenance logs yet"
+                  description="Start tracking your home maintenance to see its impact on your property's value."
+                  action={
+                    <Button
+                      className="gap-1 bg-zing-600 hover:bg-zing-700"
+                      onClick={() => navigate("/log-task")}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Log First Task
+                    </Button>
+                  }
                 />
-              ))
+              ) : (
+                require("@/lib/data")
+                  .getLogsForProperty(selectedProperty.id)
+                  .map(log => (
+                    <MaintenanceLogItem
+                      key={log.id}
+                      log={log}
+                      onClick={() => toast.info("Task details view coming soon!")}
+                    />
+                  ))
+              )
             )}
           </TabsContent>
 
           <TabsContent value="reminders" className="mt-4 space-y-4">
-            {REMINDERS.length === 0 ? (
+            {(!selectedProperty || !selectedProperty.id) ||
+            (PROPERTIES.length === 0) ? (
               <EmptyState
                 icon={<Calendar className="h-12 w-12 opacity-50" />}
                 title="No reminders set"
@@ -167,9 +246,29 @@ export default function Dashboard() {
                 }
               />
             ) : (
-              REMINDERS.map(reminder => (
-                <ReminderItem key={reminder.id} reminder={reminder} />
-              ))
+              (require("@/lib/data")
+                .getRemindersForProperty(selectedProperty.id)).length === 0 ? (
+                <EmptyState
+                  icon={<Calendar className="h-12 w-12 opacity-50" />}
+                  title="No reminders set"
+                  description="Create reminders for regular maintenance tasks to keep your home in top condition."
+                  action={
+                    <Button
+                      className="gap-1 bg-zing-600 hover:bg-zing-700"
+                      onClick={() => navigate("/add-reminder")}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add First Reminder
+                    </Button>
+                  }
+                />
+              ) : (
+                require("@/lib/data")
+                  .getRemindersForProperty(selectedProperty.id)
+                  .map(reminder => (
+                    <ReminderItem key={reminder.id} reminder={reminder} />
+                  ))
+              )
             )}
           </TabsContent>
         </Tabs>

@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo";
@@ -7,7 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { updateHome } from "@/lib/data";
+import { updateHome, addProperty, PROPERTIES, CURRENT_USER } from "@/lib/data";
 import { useAddressAutocomplete, AddressSuggestion } from "@/hooks/useAddressAutocomplete";
 import { MiniMap } from "@/components/MiniMap";
 import { MapPin, SearchIcon } from "lucide-react";
@@ -22,13 +21,13 @@ const COUNTRIES = [
   { code: "it", name: "Italy" },
   { code: "es", name: "Spain" },
   { code: "in", name: "India" },
-  // You can add more countries as needed
 ];
 
 export default function Setup() {
   const navigate = useNavigate();
   const [country, setCountry] = useState("us");
   const [rawInput, setRawInput] = useState("");
+  const [propertyName, setPropertyName] = useState("My Home");
   const [selected, setSelected] = useState<AddressSuggestion | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -36,7 +35,9 @@ export default function Setup() {
   const suggestionRef = useRef<HTMLUListElement>(null);
   const { suggestions, loading, search, clear } = useAddressAutocomplete();
 
-  // Close suggestions when clicking outside
+  const isPremium = CURRENT_USER.subscription === "Premium";
+  const canAddMore = isPremium || PROPERTIES.length === 0;
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -53,7 +54,6 @@ export default function Setup() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Update address search as user types, restricted to selected country
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setRawInput(val);
@@ -62,18 +62,15 @@ export default function Setup() {
     search(val, country);
   };
 
-  // If country changes, re-trigger search if input is long enough
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newCountry = e.target.value;
     setCountry(newCountry);
-    // Reset selection and re-trigger search if necessary
     setSelected(null);
     if (rawInput && rawInput.length >= 3) {
       search(rawInput, newCountry);
     }
   };
 
-  // When a user picks a suggestion
   const handleSuggestionClick = (s: AddressSuggestion) => {
     setRawInput(s.label);
     setSelected(s);
@@ -84,25 +81,51 @@ export default function Setup() {
     }, 100);
   };
 
+  const handlePropertyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPropertyName(e.target.value);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Only allow verified/selected address
+    if (!propertyName.trim()) {
+      toast.error("Property name is required.");
+      setIsSubmitting(false);
+      return;
+    }
+
     if (selected) {
-      updateHome(selected.label);
+      if (PROPERTIES.length === 0) {
+        updateHome(selected.label, propertyName.trim());
+      } else {
+        const added = addProperty(selected.label, propertyName.trim());
+        if (!added) {
+          toast.error("You must upgrade to add more than one property.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
     } else if (rawInput.trim().length > 0) {
       toast.error("Please select a verified address from suggestions.");
       setIsSubmitting(false);
       return;
     } else {
-      // Allow skipping address
-      updateHome(null);
+      if (PROPERTIES.length === 0) {
+        updateHome(null, propertyName.trim());
+      } else {
+        const added = addProperty(null, propertyName.trim());
+        if (!added) {
+          toast.error("You must upgrade to add more than one property.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
     }
 
     setTimeout(() => {
       setIsSubmitting(false);
-      toast.success("Home configured successfully!");
+      toast.success("Property added!");
       navigate("/dashboard");
     }, 800);
   };
@@ -120,11 +143,30 @@ export default function Setup() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Home Setup</CardTitle>
+            <CardTitle>
+              {PROPERTIES.length === 0 ? "Add Your First Property" : "Add Another Property"}
+            </CardTitle>
           </CardHeader>
           <form onSubmit={handleSubmit} autoComplete="off">
             <CardContent className="space-y-4">
-              {/* Country select */}
+              <div className="space-y-2">
+                <Label htmlFor="propertyName" className="text-base font-medium">
+                  Property Name
+                </Label>
+                <Input
+                  id="propertyName"
+                  placeholder="E.g. Lake House, Main House"
+                  value={propertyName}
+                  onChange={handlePropertyNameChange}
+                  maxLength={40}
+                  className="text-base"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Choose a custom name for this property.
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="country" className="text-base font-medium">
                   Country
@@ -142,7 +184,7 @@ export default function Setup() {
                   ))}
                 </select>
               </div>
-              {/* Address field styled like Stripe */}
+
               <div className="space-y-2">
                 <Label htmlFor="address" className="text-base font-medium">
                   Address <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
@@ -181,7 +223,6 @@ export default function Setup() {
                       style={{ boxShadow: "none" }}
                     />
                   </div>
-                  {/* Suggestions dropdown */}
                   {showSuggestions && (
                     <ul 
                       ref={suggestionRef}
@@ -213,6 +254,7 @@ export default function Setup() {
                   Start typing and select your verified address from the list. Suggestions are limited to your country.
                 </p>
               </div>
+
               {selected && (
                 <div className="mt-2">
                   <div className="bg-zing-50 p-2 rounded-md border border-zing-100">
@@ -227,21 +269,28 @@ export default function Setup() {
               <Button
                 type="submit"
                 className="w-full bg-zing-600 hover:bg-zing-700"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !canAddMore}
               >
-                {isSubmitting ? "Setting Up..." : "Continue to Dashboard"}
+                {isSubmitting ? "Adding..." : (PROPERTIES.length === 0 ? "Continue to Dashboard" : "Add Property")}
               </Button>
+              {!canAddMore && (
+                <div className="text-sm text-center text-zing-500">
+                  Upgrade to Premium to add more properties!
+                </div>
+              )}
 
               <Button
                 type="button"
                 variant="ghost"
                 className="w-full"
                 onClick={() => {
-                  updateHome(null);
+                  if (PROPERTIES.length === 0) {
+                    updateHome(null, propertyName.trim());
+                  }
                   navigate("/dashboard");
                 }}
               >
-                Skip for now
+                {PROPERTIES.length === 0 ? "Skip for now" : "Return to Dashboard"}
               </Button>
             </CardFooter>
           </form>

@@ -1,4 +1,3 @@
-
 // Mock data for development
 import { format } from 'date-fns';
 
@@ -9,11 +8,65 @@ export interface User {
   subscription: 'Free' | 'Premium';
 }
 
-export interface Home {
+export interface Property {
   id: string;
   userId: string;
   address: string | null;
+  name: string;
 }
+
+export interface Home extends Property {} // For backward compatibility
+
+// Changed HOME to PROPERTIES for multiple home support
+export let PROPERTIES: Property[] = [
+  {
+    id: "property1",
+    userId: CURRENT_USER.id,
+    address: null,
+    name: "My Home"
+  }
+];
+
+// Remove HOME variable
+// export const HOME: Home = { ... };
+
+// Utility to get the current (primary) property for free users or selected one
+export const getDefaultProperty = (): Property => {
+  return PROPERTIES[0];
+};
+
+export const addProperty = (address: string | null, name: string): Property | null => {
+  // Free: only one property; Premium: can add more
+  if (CURRENT_USER.subscription !== "Premium" && PROPERTIES.length >= 1) {
+    return null;
+  }
+  const newProperty: Property = {
+    id: `property${PROPERTIES.length + 1}`,
+    userId: CURRENT_USER.id,
+    address,
+    name,
+  };
+  PROPERTIES.push(newProperty);
+  return newProperty;
+};
+
+// Update address/name for a property by id
+export const updateProperty = (id: string, address: string | null, name: string): Property | null => {
+  const prop = PROPERTIES.find(p => p.id === id);
+  if (!prop) return null;
+  prop.address = address;
+  prop.name = name;
+  return prop;
+};
+
+// Remove property (Premium only, do not allow deleting last property)
+export const removeProperty = (id: string): boolean => {
+  if (PROPERTIES.length === 1) return false;
+  const idx = PROPERTIES.findIndex(p => p.id === id);
+  if (idx === -1) return false;
+  PROPERTIES.splice(idx, 1);
+  return true;
+};
 
 export interface MaintenanceTask {
   id: string;
@@ -25,7 +78,7 @@ export interface MaintenanceTask {
 
 export interface MaintenanceLog {
   id: string;
-  homeId: string;
+  propertyId: string; // changed field from homeId to propertyId
   taskId: string | null;
   customTask: string | null;
   date: string;
@@ -36,7 +89,7 @@ export interface MaintenanceLog {
 
 export interface Reminder {
   id: string;
-  homeId: string;
+  propertyId: string; // changed field from homeId to propertyId
   task: string;
   startDate: string;
   frequency: 'Yearly';
@@ -47,12 +100,6 @@ export const CURRENT_USER: User = {
   id: 'user1',
   email: 'demo@example.com',
   subscription: 'Free'
-};
-
-export const HOME: Home = {
-  id: 'home1',
-  userId: 'user1',
-  address: null,
 };
 
 export const MAINTENANCE_TASKS: MaintenanceTask[] = [
@@ -131,7 +178,7 @@ export const MAINTENANCE_TASKS: MaintenanceTask[] = [
 export const MAINTENANCE_LOGS: MaintenanceLog[] = [
   {
     id: 'log1',
-    homeId: 'home1',
+    propertyId: 'property1',
     taskId: 'task1',
     customTask: null,
     date: format(new Date(2025, 3, 15), 'yyyy-MM-dd'),
@@ -141,7 +188,7 @@ export const MAINTENANCE_LOGS: MaintenanceLog[] = [
   },
   {
     id: 'log2',
-    homeId: 'home1',
+    propertyId: 'property1',
     taskId: 'task2',
     customTask: null,
     date: format(new Date(2025, 2, 20), 'yyyy-MM-dd'),
@@ -154,12 +201,18 @@ export const MAINTENANCE_LOGS: MaintenanceLog[] = [
 export const REMINDERS: Reminder[] = [
   {
     id: 'reminder1',
-    homeId: 'home1',
+    propertyId: 'property1',
     task: 'Replace HVAC Air Filter',
     startDate: format(new Date(2025, 6, 1), 'yyyy-MM-dd'),
     frequency: 'Yearly'
   }
 ];
+
+// Helper: for compatibility, get logs/reminders by propertyId
+export const getLogsForProperty = (propertyId: string) =>
+  MAINTENANCE_LOGS.filter((log) => log.propertyId === propertyId);
+export const getRemindersForProperty = (propertyId: string) =>
+  REMINDERS.filter((r) => r.propertyId === propertyId);
 
 // Utility functions
 export const getTaskById = (id: string): MaintenanceTask | undefined => {
@@ -204,24 +257,23 @@ export const addLog = (log: Omit<MaintenanceLog, 'id'>): MaintenanceLog => {
     ...log,
     id: `log${MAINTENANCE_LOGS.length + 1}`
   };
-  
   MAINTENANCE_LOGS.push(newLog);
   return newLog;
 };
-
 export const addReminder = (reminder: Omit<Reminder, 'id'>): Reminder => {
   const newReminder = {
     ...reminder,
     id: `reminder${REMINDERS.length + 1}`
   };
-  
   REMINDERS.push(newReminder);
   return newReminder;
 };
 
-export const updateHome = (address: string | null): Home => {
-  HOME.address = address;
-  return HOME;
+// "Update home" now sets the primary property (property1)
+export const updateHome = (address: string | null, name: string = "My Home"): Property => {
+  PROPERTIES[0].address = address;
+  PROPERTIES[0].name = name;
+  return PROPERTIES[0];
 };
 
 export const getFreeLogsRemaining = (): number => {
