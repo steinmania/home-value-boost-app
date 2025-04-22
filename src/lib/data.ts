@@ -17,6 +17,13 @@ export interface Property {
 
 export interface Home extends Property {} // For backward compatibility
 
+// Mock data - moved CURRENT_USER before PROPERTIES to fix circular reference
+export const CURRENT_USER: User = {
+  id: 'user1',
+  email: 'demo@example.com',
+  subscription: 'Free'
+};
+
 // Changed HOME to PROPERTIES for multiple home support
 export let PROPERTIES: Property[] = [
   {
@@ -96,12 +103,6 @@ export interface Reminder {
 }
 
 // Mock data
-export const CURRENT_USER: User = {
-  id: 'user1',
-  email: 'demo@example.com',
-  subscription: 'Free'
-};
-
 export const MAINTENANCE_TASKS: MaintenanceTask[] = [
   {
     id: 'task1',

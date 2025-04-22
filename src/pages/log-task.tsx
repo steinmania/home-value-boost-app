@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { MAINTENANCE_TASKS, HOME, addLog, getTaskById } from "@/lib/data";
+import { MAINTENANCE_TASKS, addLog, getTaskById, getDefaultProperty } from "@/lib/data";
 import { canAddLog } from "@/lib/utils/subscription";
 
 export default function LogTask() {
@@ -48,7 +48,7 @@ export default function LogTask() {
     
     // Add log
     addLog({
-      homeId: HOME.id,
+      propertyId: getDefaultProperty().id,
       taskId,
       customTask: formData.customTask || null,
       date: formData.date,

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { toast } from "sonner";
-import { HOME, MAINTENANCE_TASKS, addReminder } from "@/lib/data";
+import { MAINTENANCE_TASKS, addReminder, getDefaultProperty } from "@/lib/data";
 import { canAddReminder } from "@/lib/utils/subscription";
 
 export default function AddReminder() {
@@ -42,7 +42,7 @@ export default function AddReminder() {
     
     // Add reminder
     addReminder({
-      homeId: HOME.id,
+      propertyId: getDefaultProperty().id,
       task: formData.task,
       startDate: formData.startDate,
       frequency: formData.frequency
