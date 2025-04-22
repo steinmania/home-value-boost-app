@@ -36,7 +36,8 @@ export function useAddressAutocomplete() {
       }
       
       // Add additional parameters for better search results
-      url += "&featuretype=street&namedetails=1";
+      // street_address and city focus on more specific locations
+      url += "&featuretype=street&featuretype=house&featuretype=city&namedetails=1";
       
       const res = await fetch(url, {
         headers: { 
@@ -58,7 +59,13 @@ export function useAddressAutocomplete() {
             // Filter out results that don't have enough information
             item.display_name && 
             item.lat && 
-            item.lon
+            item.lon &&
+            // Ensure we have proper address components
+            item.address &&
+            // Prefer results with more address details
+            (item.address.road || item.address.house_number || 
+             item.address.city || item.address.town || 
+             item.address.postcode || item.address.state)
           )
           .map((item: any) => ({
             label: item.display_name,

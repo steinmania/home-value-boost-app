@@ -31,6 +31,7 @@ export const MiniMap: React.FC<MiniMapProps> = ({
 }) => {
   if (!lat || !lon) return null;
   
+  // Define the position for the map and marker
   const position: [number, number] = [lat, lon];
 
   return (
