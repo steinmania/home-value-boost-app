@@ -74,9 +74,9 @@ export const MiniStreetView: React.FC<MiniStreetViewProps> = ({
           >
             {address ? address.substring(0, 20) + (address.length > 20 ? "..." : "") : clickToAdd ? "Click to add address" : "No address"}
           </div>
-          {isApiKeyAvailable ? null : (
+          {isApiKeyAvailable === false ? (
             <span className="text-[8px] text-gray-400 mt-1">{clickToAdd ? "Setup your property" : "Set API key for Street View"}</span>
-          )}
+          ) : null}
         </div>
       )}
     </div>
