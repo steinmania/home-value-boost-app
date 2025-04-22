@@ -36,10 +36,10 @@ export const MiniMap: React.FC<MiniMapProps> = ({
   return (
     <div className="rounded-lg shadow border overflow-hidden" style={{ height }}>
       <MapContainer
+        className="h-full w-full"
         center={position}
         zoom={zoom}
         scrollWheelZoom={false}
-        style={{ height: "100%", width: "100%" }}
         attributionControl={false}
         dragging={false}
         doubleClickZoom={false}
@@ -47,7 +47,6 @@ export const MiniMap: React.FC<MiniMapProps> = ({
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         <Marker position={position}>
           {label && <Popup>{label}</Popup>}

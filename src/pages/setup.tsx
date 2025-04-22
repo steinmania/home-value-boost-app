@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { updateHome } from "@/lib/data";
 import { useAddressAutocomplete, AddressSuggestion } from "@/hooks/useAddressAutocomplete";
 import { MiniMap } from "@/components/MiniMap";
-import { MapPin } from "lucide-react";
+import { MapPin, SearchIcon } from "lucide-react";
 
 const COUNTRIES = [
   { code: "us", name: "United States" },
@@ -31,14 +31,34 @@ export default function Setup() {
   const [rawInput, setRawInput] = useState("");
   const [selected, setSelected] = useState<AddressSuggestion | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionRef = useRef<HTMLUListElement>(null);
   const { suggestions, loading, search, clear } = useAddressAutocomplete();
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionRef.current && 
+        !suggestionRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Update address search as user types, restricted to selected country
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setRawInput(val);
     setSelected(null);
+    setShowSuggestions(true);
     search(val, country);
   };
 
@@ -48,7 +68,7 @@ export default function Setup() {
     setCountry(newCountry);
     // Reset selection and re-trigger search if necessary
     setSelected(null);
-    if (rawInput && rawInput.length >= 4) {
+    if (rawInput && rawInput.length >= 3) {
       search(rawInput, newCountry);
     }
   };
@@ -57,6 +77,7 @@ export default function Setup() {
   const handleSuggestionClick = (s: AddressSuggestion) => {
     setRawInput(s.label);
     setSelected(s);
+    setShowSuggestions(false);
     clear();
     setTimeout(() => {
       inputRef.current?.blur();
@@ -127,14 +148,33 @@ export default function Setup() {
                   Address <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
                 </Label>
                 <div className="relative">
-                  <div className="flex items-center border border-zing-300 rounded-md bg-background px-3 focus-within:border-zing-500 focus-within:ring-2 focus-within:ring-zing-500 transition">
-                    <MapPin className="h-5 w-5 text-zing-400 mr-2 flex-shrink-0" aria-hidden />
+                  <div 
+                    className={`flex items-center border rounded-md bg-background px-3 transition ${
+                      showSuggestions ? "border-zing-500 ring-2 ring-zing-500" : "border-zing-300"
+                    }`}
+                    onClick={() => {
+                      inputRef.current?.focus();
+                      if (rawInput.length >= 3) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                  >
+                    {loading ? (
+                      <div className="h-5 w-5 rounded-full border-2 border-zing-500 border-t-transparent animate-spin mr-2" />
+                    ) : (
+                      <MapPin className="h-5 w-5 text-zing-400 mr-2 flex-shrink-0" aria-hidden />
+                    )}
                     <Input
                       id="address"
                       ref={inputRef}
                       placeholder="Start typing address"
                       value={rawInput}
                       onChange={handleInputChange}
+                      onFocus={() => {
+                        if (rawInput.length >= 3) {
+                          setShowSuggestions(true);
+                        }
+                      }}
                       maxLength={100}
                       autoComplete="off"
                       className="border-0 outline-none shadow-none px-0 py-2 text-base bg-transparent focus-visible:ring-0" 
@@ -142,17 +182,25 @@ export default function Setup() {
                     />
                   </div>
                   {/* Suggestions dropdown */}
-                  {loading && (
-                    <div className="absolute left-0 right-0 bg-white border rounded shadow-sm z-30 mt-1 p-2 text-sm">
-                      Loading suggestions...
-                    </div>
-                  )}
-                  {suggestions.length > 0 && (
-                    <ul className="absolute left-0 right-0 bg-white border rounded shadow-md z-30 mt-1 max-h-48 overflow-auto">
+                  {showSuggestions && (
+                    <ul 
+                      ref={suggestionRef}
+                      className="absolute left-0 right-0 bg-white border rounded-md shadow-md z-30 mt-1 max-h-48 overflow-auto"
+                    >
+                      {loading && suggestions.length === 0 && (
+                        <li className="p-3 text-sm text-muted-foreground">
+                          Searching...
+                        </li>
+                      )}
+                      {!loading && suggestions.length === 0 && rawInput.length >= 3 && (
+                        <li className="p-3 text-sm text-muted-foreground">
+                          No matches found. Try a different search.
+                        </li>
+                      )}
                       {suggestions.map((s, i) => (
                         <li
                           key={i}
-                          className="p-2 hover:bg-zing-50 cursor-pointer transition"
+                          className="p-3 hover:bg-zing-50 cursor-pointer transition border-b last:border-0 text-sm"
                           onClick={() => handleSuggestionClick(s)}
                         >
                           {s.label}
@@ -166,10 +214,12 @@ export default function Setup() {
                 </p>
               </div>
               {selected && (
-                <div>
-                  <span className="font-semibold text-sm">Verified:</span>
-                  <div className="text-xs text-muted-foreground mb-2">{selected.label}</div>
-                  <MiniMap lat={selected.lat} lon={selected.lon} label={selected.label} height={140}/>
+                <div className="mt-2">
+                  <div className="bg-zing-50 p-2 rounded-md border border-zing-100">
+                    <span className="font-medium text-sm text-zing-700">Verified Address:</span>
+                    <div className="text-xs text-muted-foreground mb-2">{selected.label}</div>
+                    <MiniMap lat={selected.lat} lon={selected.lon} label={selected.label} height={140} />
+                  </div>
                 </div>
               )}
             </CardContent>
