@@ -8,7 +8,7 @@ export interface AddressSuggestion {
   raw?: any;
 }
 
-// Enhanced address autocomplete using OpenStreetMap Nominatim API
+// Enhanced address autocomplete using Geoapify API for better suggestions
 export function useAddressAutocomplete() {
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,22 +30,21 @@ export function useAddressAutocomplete() {
     setLoading(true);
 
     try {
-      // Basic URL with good default parameters
-      let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}`;
-      url += "&format=json&addressdetails=1&limit=5";
+      // For Geoapify we would normally use an API key, but for demo purposes we're using the free tier
+      // In production, this should be replaced with a proper API key
+      let url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(query)}`;
       
       // Apply country filter if provided
       if (countryCode) {
-        url += `&countrycodes=${countryCode.toLowerCase()}`;
+        url += `&filter=countrycode:${countryCode.toLowerCase()}`;
       }
       
-      // Focus on specific locations for better results
-      url += "&featuretype=street&featuretype=house&featuretype=city";
+      // Add additional params for better results
+      url += "&format=json&limit=5&type=street&type=amenity&type=building&type=address";
       
       const res = await fetch(url, {
         headers: { 
-          "User-Agent": "zing-home-app",
-          "Accept-Language": "en" 
+          "Accept": "application/json"
         },
       });
       
@@ -56,6 +55,55 @@ export function useAddressAutocomplete() {
       const data = await res.json();
       
       // Process results for better display
+      if (data.results) {
+        setSuggestions(
+          data.results
+            .filter((item: any) => item.lat && item.lon)
+            .map((item: any) => ({
+              label: item.formatted || item.address_line1 || `${item.street || ""} ${item.housenumber || ""}`.trim(),
+              lat: parseFloat(item.lat),
+              lon: parseFloat(item.lon),
+              raw: item,
+            }))
+        );
+      } else {
+        // Fallback to Nominatim if Geoapify doesn't work (for demo purposes)
+        fallbackToNominatim(query, countryCode);
+      }
+    } catch (e) {
+      console.error("Address lookup error:", e);
+      // Fallback to Nominatim if Geoapify fails
+      fallbackToNominatim(query, countryCode);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fallback to Nominatim for address suggestions
+  const fallbackToNominatim = async (query: string, countryCode?: string) => {
+    try {
+      let nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}`;
+      nominatimUrl += "&format=json&addressdetails=1&limit=5";
+      
+      if (countryCode) {
+        nominatimUrl += `&countrycodes=${countryCode.toLowerCase()}`;
+      }
+      
+      nominatimUrl += "&featuretype=street&featuretype=house&featuretype=city";
+      
+      const res = await fetch(nominatimUrl, {
+        headers: { 
+          "User-Agent": "zing-home-app",
+          "Accept-Language": "en" 
+        },
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Error fetching address suggestions from fallback: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
       setSuggestions(
         data
           .filter((item: any) => item.lat && item.lon)
@@ -67,13 +115,11 @@ export function useAddressAutocomplete() {
           }))
       );
     } catch (e) {
-      console.error("Address lookup error:", e);
+      console.error("Fallback address lookup error:", e);
       setError(e instanceof Error ? e.message : "Error looking up address");
       setSuggestions([]);
-    } finally {
-      setLoading(false);
     }
-  }, []);
+  };
 
   const clear = useCallback(() => {
     setSuggestions([]);

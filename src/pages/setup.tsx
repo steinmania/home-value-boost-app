@@ -39,6 +39,9 @@ export default function Setup() {
 
   const isPremium = CURRENT_USER.subscription === "Premium";
   const canAddMore = isPremium || PROPERTIES.length === 0;
+  
+  // Determine if the form is valid and enabled
+  const isFormValid = propertyName.trim().length > 0;
 
   // Handle clicks outside the suggestion dropdown
   useEffect(() => {
@@ -109,7 +112,7 @@ export default function Setup() {
       if (PROPERTIES.length === 0) {
         // First property (free tier)
         updateHome(
-          selected ? selected.label : null, 
+          selected ? selected.label : rawInput || null, 
           propertyName.trim()
         );
         
@@ -117,7 +120,7 @@ export default function Setup() {
       } else if (isPremium) {
         // Additional property (premium tier)
         const added = addProperty(
-          selected ? selected.label : null,
+          selected ? selected.label : rawInput || null,
           propertyName.trim()
         );
         
@@ -287,7 +290,7 @@ export default function Setup() {
               <Button
                 type="submit"
                 className="w-full bg-zing-600 hover:bg-zing-700"
-                disabled={isSubmitting || !canAddMore}
+                disabled={!isFormValid || isSubmitting || !canAddMore}
               >
                 {isSubmitting 
                   ? "Adding..." 

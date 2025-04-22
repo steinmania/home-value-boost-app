@@ -53,6 +53,9 @@ export default function Dashboard() {
   const logsForProperty = getLogsForProperty(selectedProperty?.id || "");
   const remindersForProperty = getRemindersForProperty(selectedProperty?.id || "");
 
+  // Direct to setup if no properties
+  const hasNoProperties = properties.length === 0;
+
   // Load map locations when properties change
   useEffect(() => {
     async function loadLocations() {
@@ -126,32 +129,62 @@ export default function Dashboard() {
                     )}
                   </div>
                 ))}
+                
+                {/* Add new property card */}
+                {isPremium && (
+                  <div
+                    className="rounded-md border border-dashed border-zing-300 p-3 cursor-pointer shadow-sm transition hover:shadow-md bg-white flex flex-col items-center justify-center w-52 h-[216px]"
+                    onClick={() => navigate("/setup")}
+                  >
+                    <div className="h-14 w-14 rounded-full bg-zing-50 flex items-center justify-center mb-2">
+                      <Plus className="h-8 w-8 text-zing-400" />
+                    </div>
+                    <div className="text-sm font-semibold text-zing-700">Add New Property</div>
+                    <div className="text-xs text-muted-foreground text-center mt-1">Add another property to your portfolio</div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
             // Single property view
             <div>
               <div className="mb-2 font-medium">My Property:</div>
-              <div className="rounded-md border border-zing-200 p-3 bg-white flex flex-col items-center w-72">
-                <MiniStreetView 
-                  address={selectedProperty?.address || ""} 
-                  width={160}
-                  height={100}
-                />
-                <div className="mt-2 text-sm font-semibold text-zing-700">{selectedProperty?.name}</div>
-                <div className="text-xs text-muted-foreground line-clamp-2 text-center">{selectedProperty?.address || "No address set"}</div>
-                {selectedProperty?.address && mapLocations[selectedProperty?.id] && (
-                  <div className="mt-1 w-full">
-                    <MiniMap
-                      lat={mapLocations[selectedProperty?.id]?.lat as number}
-                      lon={mapLocations[selectedProperty?.id]?.lon as number}
-                      label={selectedProperty?.address}
-                      height={80}
-                      zoom={15}
-                    />
-                  </div>
-                )}
-              </div>
+              {hasNoProperties ? (
+                <div 
+                  className="rounded-md border border-dashed border-zing-300 p-4 bg-white flex flex-col items-center justify-center w-72 cursor-pointer hover:shadow-md transition"
+                  onClick={() => navigate("/setup")}
+                >
+                  <MiniStreetView 
+                    address="" 
+                    width={160}
+                    height={100}
+                    clickToAdd={true}
+                  />
+                  <div className="mt-3 text-sm font-semibold text-zing-700">Add Your First Property</div>
+                  <div className="text-xs text-muted-foreground text-center mt-1">Click to setup your property details</div>
+                </div>
+              ) : (
+                <div className="rounded-md border border-zing-200 p-3 bg-white flex flex-col items-center w-72">
+                  <MiniStreetView 
+                    address={selectedProperty?.address || ""} 
+                    width={160}
+                    height={100}
+                  />
+                  <div className="mt-2 text-sm font-semibold text-zing-700">{selectedProperty?.name}</div>
+                  <div className="text-xs text-muted-foreground line-clamp-2 text-center">{selectedProperty?.address || "No address set"}</div>
+                  {selectedProperty?.address && mapLocations[selectedProperty?.id] && (
+                    <div className="mt-1 w-full">
+                      <MiniMap
+                        lat={mapLocations[selectedProperty?.id]?.lat as number}
+                        lon={mapLocations[selectedProperty?.id]?.lon as number}
+                        label={selectedProperty?.address}
+                        height={80}
+                        zoom={15}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -203,8 +236,7 @@ export default function Dashboard() {
 
           {/* History content */}
           <TabsContent value="history" className="mt-4 space-y-4">
-            {(!selectedProperty || !selectedProperty.id) ||
-            (properties.length === 0) ? (
+            {hasNoProperties || !selectedProperty || !selectedProperty.id ? (
               <EmptyState
                 icon={<History className="h-12 w-12 opacity-50" />}
                 title="No maintenance logs yet"
@@ -212,10 +244,10 @@ export default function Dashboard() {
                 action={
                   <Button
                     className="gap-1 bg-zing-600 hover:bg-zing-700"
-                    onClick={() => navigate("/log-task")}
+                    onClick={() => hasNoProperties ? navigate("/setup") : navigate("/log-task")}
                   >
                     <Plus className="h-4 w-4" />
-                    Log First Task
+                    {hasNoProperties ? "Add First Property" : "Log First Task"}
                   </Button>
                 }
               />
@@ -249,8 +281,7 @@ export default function Dashboard() {
 
           {/* Reminders content */}
           <TabsContent value="reminders" className="mt-4 space-y-4">
-            {(!selectedProperty || !selectedProperty.id) ||
-            (properties.length === 0) ? (
+            {hasNoProperties || !selectedProperty || !selectedProperty.id ? (
               <EmptyState
                 icon={<Calendar className="h-12 w-12 opacity-50" />}
                 title="No reminders set"
@@ -258,10 +289,10 @@ export default function Dashboard() {
                 action={
                   <Button
                     className="gap-1 bg-zing-600 hover:bg-zing-700"
-                    onClick={() => navigate("/add-reminder")}
+                    onClick={() => hasNoProperties ? navigate("/setup") : navigate("/add-reminder")}
                   >
                     <Plus className="h-4 w-4" />
-                    Add First Reminder
+                    {hasNoProperties ? "Add First Property" : "Add First Reminder"}
                   </Button>
                 }
               />
