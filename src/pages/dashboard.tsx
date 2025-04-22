@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { HOME, MAINTENANCE_LOGS, REMINDERS } from "@/lib/data";
 import { NavBar } from "@/components/NavBar";
@@ -11,15 +11,42 @@ import { ReminderItem } from "@/components/ReminderItem";
 import { EmptyState } from "@/components/EmptyState";
 import { ValueDisplay } from "@/components/ValueDisplay";
 import { toast } from "sonner";
+import { MiniMap } from "@/components/MiniMap";
+
+// Helper to fetch lat/lon for the current home address
+async function geocodeAddress(address: string): Promise<{ lat: number; lon: number } | null> {
+  if (!address) return null;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+      address
+    )}&format=json&limit=1`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data[0]) return null;
+    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  }
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>("history");
-  
+  const [mapLocation, setMapLocation] = useState<{ lat: number; lon: number } | null>(null);
+
+  // When address changes, update lat/lon
+  useMemo(() => {
+    if (HOME.address) {
+      geocodeAddress(HOME.address).then(setMapLocation);
+    } else {
+      setMapLocation(null);
+    }
+  }, [HOME.address]);
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <NavBar />
-      
+
       <div className="container px-4 py-6 flex flex-col flex-1">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -30,9 +57,9 @@ export default function Dashboard() {
               <p className="text-muted-foreground">{HOME.address}</p>
             )}
           </div>
-          
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             size="icon"
             className="rounded-full h-10 w-10"
             onClick={() => navigate("/setup")}
@@ -40,14 +67,26 @@ export default function Dashboard() {
             <Home className="h-5 w-5" />
           </Button>
         </div>
-        
+
+        {/* MiniMap for user's address */}
+        {HOME.address && mapLocation && (
+          <div className="mb-4">
+            <MiniMap
+              lat={mapLocation.lat}
+              lon={mapLocation.lon}
+              label={HOME.address}
+              height={180}
+            />
+          </div>
+        )}
+
         <ValueDisplay />
-        
+
         <div className="mt-6 flex items-center justify-between">
           <h2 className="text-lg font-medium">Your Maintenance</h2>
-          
+
           <div className="flex gap-2">
-            <Button 
+            <Button
               size="sm"
               className="gap-1 bg-zing-600 hover:bg-zing-700"
               onClick={() => navigate("/log-task")}
@@ -55,9 +94,9 @@ export default function Dashboard() {
               <Plus className="h-4 w-4" />
               Log Task
             </Button>
-            
-            <Button 
-              size="sm" 
+
+            <Button
+              size="sm"
               variant="outline"
               className="gap-1"
               onClick={() => navigate("/add-reminder")}
@@ -67,10 +106,10 @@ export default function Dashboard() {
             </Button>
           </div>
         </div>
-        
-        <Tabs 
-          value={activeTab} 
-          onValueChange={setActiveTab} 
+
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
           className="mt-4"
         >
           <TabsList className="grid grid-cols-2">
@@ -83,7 +122,7 @@ export default function Dashboard() {
               Reminders
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="history" className="mt-4 space-y-4">
             {MAINTENANCE_LOGS.length === 0 ? (
               <EmptyState
@@ -91,7 +130,7 @@ export default function Dashboard() {
                 title="No maintenance logs yet"
                 description="Start tracking your home maintenance to see its impact on your property's value."
                 action={
-                  <Button 
+                  <Button
                     className="gap-1 bg-zing-600 hover:bg-zing-700"
                     onClick={() => navigate("/log-task")}
                   >
@@ -102,15 +141,15 @@ export default function Dashboard() {
               />
             ) : (
               MAINTENANCE_LOGS.map(log => (
-                <MaintenanceLogItem 
-                  key={log.id} 
+                <MaintenanceLogItem
+                  key={log.id}
                   log={log}
                   onClick={() => toast.info("Task details view coming soon!")}
                 />
               ))
             )}
           </TabsContent>
-          
+
           <TabsContent value="reminders" className="mt-4 space-y-4">
             {REMINDERS.length === 0 ? (
               <EmptyState
