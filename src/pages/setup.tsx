@@ -10,24 +10,50 @@ import { toast } from "sonner";
 import { updateHome } from "@/lib/data";
 import { useAddressAutocomplete, AddressSuggestion } from "@/hooks/useAddressAutocomplete";
 import { MiniMap } from "@/components/MiniMap";
+import { MapPin } from "lucide-react";
+
+const COUNTRIES = [
+  { code: "us", name: "United States" },
+  { code: "ca", name: "Canada" },
+  { code: "gb", name: "United Kingdom" },
+  { code: "au", name: "Australia" },
+  { code: "fr", name: "France" },
+  { code: "de", name: "Germany" },
+  { code: "it", name: "Italy" },
+  { code: "es", name: "Spain" },
+  { code: "in", name: "India" },
+  // You can add more countries as needed
+];
 
 export default function Setup() {
   const navigate = useNavigate();
+  const [country, setCountry] = useState("us");
   const [rawInput, setRawInput] = useState("");
   const [selected, setSelected] = useState<AddressSuggestion | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { suggestions, loading, search, clear } = useAddressAutocomplete();
 
-  // When user types, search for address suggestions
+  // Update address search as user types, restricted to selected country
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setRawInput(val);
     setSelected(null);
-    search(val);
+    search(val, country);
   };
 
-  // User picks from suggestions
+  // If country changes, re-trigger search if input is long enough
+  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newCountry = e.target.value;
+    setCountry(newCountry);
+    // Reset selection and re-trigger search if necessary
+    setSelected(null);
+    if (rawInput && rawInput.length >= 4) {
+      search(rawInput, newCountry);
+    }
+  };
+
+  // When a user picks a suggestion
   const handleSuggestionClick = (s: AddressSuggestion) => {
     setRawInput(s.label);
     setSelected(s);
@@ -77,18 +103,44 @@ export default function Setup() {
           </CardHeader>
           <form onSubmit={handleSubmit} autoComplete="off">
             <CardContent className="space-y-4">
+              {/* Country select */}
               <div className="space-y-2">
-                <Label htmlFor="address">Home Address (Optional)</Label>
+                <Label htmlFor="country" className="text-base font-medium">
+                  Country
+                </Label>
+                <select
+                  id="country"
+                  className="block w-full rounded border border-zing-200 bg-background p-2 text-base focus-visible:ring-2 focus-visible:ring-zing-600 focus-visible:ring-offset-2"
+                  value={country}
+                  onChange={handleCountryChange}
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {/* Address field styled like Stripe */}
+              <div className="space-y-2">
+                <Label htmlFor="address" className="text-base font-medium">
+                  Address <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                </Label>
                 <div className="relative">
-                  <Input
-                    id="address"
-                    ref={inputRef}
-                    placeholder="Start typing address"
-                    value={rawInput}
-                    onChange={handleInputChange}
-                    maxLength={100}
-                    autoComplete="off"
-                  />
+                  <div className="flex items-center border border-zing-300 rounded-md bg-background px-3 focus-within:border-zing-500 focus-within:ring-2 focus-within:ring-zing-500 transition">
+                    <MapPin className="h-5 w-5 text-zing-400 mr-2 flex-shrink-0" aria-hidden />
+                    <Input
+                      id="address"
+                      ref={inputRef}
+                      placeholder="Start typing address"
+                      value={rawInput}
+                      onChange={handleInputChange}
+                      maxLength={100}
+                      autoComplete="off"
+                      className="border-0 outline-none shadow-none px-0 py-2 text-base bg-transparent focus-visible:ring-0" 
+                      style={{ boxShadow: "none" }}
+                    />
+                  </div>
                   {/* Suggestions dropdown */}
                   {loading && (
                     <div className="absolute left-0 right-0 bg-white border rounded shadow-sm z-30 mt-1 p-2 text-sm">
@@ -110,7 +162,7 @@ export default function Setup() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Start typing and select your verified address from the list.
+                  Start typing and select your verified address from the list. Suggestions are limited to your country.
                 </p>
               </div>
               {selected && (

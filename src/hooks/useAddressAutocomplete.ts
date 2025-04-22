@@ -13,7 +13,11 @@ export function useAddressAutocomplete() {
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const search = useCallback(async (query: string) => {
+  /**
+   * @param query Address or partial address to search for
+   * @param countryCode ISO 3166-1 alpha2 country code (e.g. 'us')
+   */
+  const search = useCallback(async (query: string, countryCode?: string) => {
     if (!query || query.length < 4) {
       setSuggestions([]);
       return;
@@ -21,9 +25,12 @@ export function useAddressAutocomplete() {
     setLoading(true);
 
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+      let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
         query
       )}&format=json&addressdetails=1&limit=5`;
+      if (countryCode) {
+        url += `&countrycodes=${countryCode.toLowerCase()}`;
+      }
       const res = await fetch(url, {
         headers: { "User-Agent": "zing-home-app" },
       });
