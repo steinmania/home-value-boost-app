@@ -42,6 +42,7 @@ export default function Setup() {
   
   // Determine if the form is valid and enabled
   const isFormValid = propertyName.trim().length > 0;
+  const hasAddressInput = rawInput.trim().length > 0 || selected;
 
   // Handle clicks outside the suggestion dropdown
   useEffect(() => {
@@ -64,7 +65,11 @@ export default function Setup() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setRawInput(val);
-    setSelected(null);
+    
+    // Only clear selected if input changes
+    if (selected && val !== selected.label) {
+      setSelected(null);
+    }
     
     if (val.length >= 3) {
       setShowSuggestions(true);
@@ -112,7 +117,7 @@ export default function Setup() {
       if (PROPERTIES.length === 0) {
         // First property (free tier)
         updateHome(
-          selected ? selected.label : rawInput || null, 
+          selected ? selected.label : rawInput.trim() || null, 
           propertyName.trim()
         );
         
@@ -120,7 +125,7 @@ export default function Setup() {
       } else if (isPremium) {
         // Additional property (premium tier)
         const added = addProperty(
-          selected ? selected.label : rawInput || null,
+          selected ? selected.label : rawInput.trim() || null,
           propertyName.trim()
         );
         

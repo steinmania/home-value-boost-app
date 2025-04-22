@@ -8,7 +8,7 @@ export interface AddressSuggestion {
   raw?: any;
 }
 
-// Enhanced address autocomplete using Geoapify API for better suggestions
+// Enhanced address autocomplete using Geoapify API with Nominatim fallback
 export function useAddressAutocomplete() {
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,58 +30,8 @@ export function useAddressAutocomplete() {
     setLoading(true);
 
     try {
-      // For Geoapify we would normally use an API key, but for demo purposes we're using the free tier
-      // In production, this should be replaced with a proper API key
-      let url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(query)}`;
-      
-      // Apply country filter if provided
-      if (countryCode) {
-        url += `&filter=countrycode:${countryCode.toLowerCase()}`;
-      }
-      
-      // Add additional params for better results
-      url += "&format=json&limit=5&type=street&type=amenity&type=building&type=address";
-      
-      const res = await fetch(url, {
-        headers: { 
-          "Accept": "application/json"
-        },
-      });
-      
-      if (!res.ok) {
-        throw new Error(`Error fetching address suggestions: ${res.status}`);
-      }
-      
-      const data = await res.json();
-      
-      // Process results for better display
-      if (data.results) {
-        setSuggestions(
-          data.results
-            .filter((item: any) => item.lat && item.lon)
-            .map((item: any) => ({
-              label: item.formatted || item.address_line1 || `${item.street || ""} ${item.housenumber || ""}`.trim(),
-              lat: parseFloat(item.lat),
-              lon: parseFloat(item.lon),
-              raw: item,
-            }))
-        );
-      } else {
-        // Fallback to Nominatim if Geoapify doesn't work (for demo purposes)
-        fallbackToNominatim(query, countryCode);
-      }
-    } catch (e) {
-      console.error("Address lookup error:", e);
-      // Fallback to Nominatim if Geoapify fails
-      fallbackToNominatim(query, countryCode);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Fallback to Nominatim for address suggestions
-  const fallbackToNominatim = async (query: string, countryCode?: string) => {
-    try {
+      // Using Nominatim (OpenStreetMap) API for address suggestions
+      // This is a reliable free alternative to commercial APIs
       let nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}`;
       nominatimUrl += "&format=json&addressdetails=1&limit=5";
       
@@ -89,7 +39,8 @@ export function useAddressAutocomplete() {
         nominatimUrl += `&countrycodes=${countryCode.toLowerCase()}`;
       }
       
-      nominatimUrl += "&featuretype=street&featuretype=house&featuretype=city";
+      // Add parameters to improve address results
+      nominatimUrl += "&featuretype=street&featuretype=house&featuretype=building&featuretype=residential";
       
       const res = await fetch(nominatimUrl, {
         headers: { 
@@ -99,27 +50,72 @@ export function useAddressAutocomplete() {
       });
       
       if (!res.ok) {
-        throw new Error(`Error fetching address suggestions from fallback: ${res.status}`);
+        throw new Error(`Error fetching address suggestions: ${res.status}`);
       }
       
       const data = await res.json();
       
-      setSuggestions(
-        data
-          .filter((item: any) => item.lat && item.lon)
-          .map((item: any) => ({
-            label: item.display_name,
-            lat: parseFloat(item.lat),
-            lon: parseFloat(item.lon),
-            raw: item,
-          }))
-      );
+      // Process and normalize the results
+      if (data && Array.isArray(data)) {
+        setSuggestions(
+          data
+            .filter((item: any) => item.lat && item.lon)
+            .map((item: any) => {
+              // Create a nicely formatted address from components
+              let formattedAddress = '';
+              const addr = item.address || {};
+              
+              // Street address part
+              if (addr.house_number && addr.road) {
+                formattedAddress += `${addr.house_number} ${addr.road}`;
+              } else if (addr.road) {
+                formattedAddress += addr.road;
+              } else if (item.display_name) {
+                // Fall back to display_name if we don't have structured address
+                formattedAddress = item.display_name;
+              }
+              
+              // City/locality part
+              if (addr.city || addr.town || addr.village || addr.hamlet) {
+                const locality = addr.city || addr.town || addr.village || addr.hamlet;
+                if (formattedAddress && !formattedAddress.includes(locality)) {
+                  formattedAddress += `, ${locality}`;
+                }
+              }
+              
+              // State and postal code
+              if (addr.state && addr.postcode) {
+                if (!formattedAddress.includes(addr.state)) {
+                  formattedAddress += `, ${addr.state} ${addr.postcode}`;
+                }
+              } else if (addr.state) {
+                if (!formattedAddress.includes(addr.state)) {
+                  formattedAddress += `, ${addr.state}`;
+                }
+              }
+              
+              // Use display_name as fallback
+              if (!formattedAddress) {
+                formattedAddress = item.display_name;
+              }
+              
+              return {
+                label: formattedAddress,
+                lat: parseFloat(item.lat),
+                lon: parseFloat(item.lon),
+                raw: item,
+              };
+            })
+        );
+      }
     } catch (e) {
-      console.error("Fallback address lookup error:", e);
+      console.error("Address lookup error:", e);
       setError(e instanceof Error ? e.message : "Error looking up address");
       setSuggestions([]);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   const clear = useCallback(() => {
     setSuggestions([]);

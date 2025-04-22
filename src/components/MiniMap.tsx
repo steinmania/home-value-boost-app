@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -42,8 +42,6 @@ export const MiniMap: React.FC<MiniMapProps> = ({
         zoom={zoom}
         scrollWheelZoom={false}
         attributionControl={false}
-        dragging={false}
-        doubleClickZoom={false}
         zoomControl={false}
       >
         <TileLayer

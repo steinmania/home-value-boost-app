@@ -21,7 +21,12 @@ const geocodeAddress = async (address: string): Promise<{ lat: number; lon: numb
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
       address
     )}&format=json&limit=1`;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: { 
+        "User-Agent": "zing-home-app",
+        "Accept-Language": "en" 
+      },
+    });
     const data = await res.json();
     if (!data[0]) return null;
     return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
@@ -50,8 +55,8 @@ export default function Dashboard() {
   const title = isPremium && properties.length > 1 ? "My properties" : "My property";
 
   // Get logs and reminders for selected property
-  const logsForProperty = getLogsForProperty(selectedProperty?.id || "");
-  const remindersForProperty = getRemindersForProperty(selectedProperty?.id || "");
+  const logsForProperty = selectedProperty ? getLogsForProperty(selectedProperty.id) : [];
+  const remindersForProperty = selectedProperty ? getRemindersForProperty(selectedProperty.id) : [];
 
   // Direct to setup if no properties
   const hasNoProperties = properties.length === 0;
@@ -113,6 +118,7 @@ export default function Dashboard() {
                       address={p.address || ""} 
                       width={120}
                       height={80}
+                      clickToAdd={!p.address}
                     />
                     <div className="mt-2 text-sm font-semibold text-zing-700">{p.name}</div>
                     <div className="text-xs text-muted-foreground line-clamp-2 text-center">{p.address || "No address set"}</div>
@@ -169,6 +175,7 @@ export default function Dashboard() {
                     address={selectedProperty?.address || ""} 
                     width={160}
                     height={100}
+                    clickToAdd={!selectedProperty?.address}
                   />
                   <div className="mt-2 text-sm font-semibold text-zing-700">{selectedProperty?.name}</div>
                   <div className="text-xs text-muted-foreground line-clamp-2 text-center">{selectedProperty?.address || "No address set"}</div>
