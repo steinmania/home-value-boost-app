@@ -47,10 +47,11 @@ export const MiniMap: React.FC<MiniMapProps> = ({
     <div className="rounded-lg shadow border overflow-hidden" style={{ height }}>
       <MapContainer
         className="h-full w-full"
-        scrollWheelZoom={false}
         attributionControl={false}
         zoomControl={false}
-        // The initial center/zoom doesn't matter as we'll set it using the SetViewOnLoad component
+        whenCreated={(map) => {
+          map.scrollWheelZoom.disable();
+        }}
         style={{ height: "100%", width: "100%" }}
       >
         <SetViewOnLoad coords={position} zoom={zoom} />
