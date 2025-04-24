@@ -2,8 +2,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
-// If you have a Google Street View Static API key, set it here
-const GOOGLE_STREET_VIEW_API_KEY = "";
+const GOOGLE_STREET_VIEW_API_KEY = 'AIzaSyCfB3X2c5mdUau4GljTkb2dLk5o3nH6qOw';
 
 interface MiniStreetViewProps {
   address: string;
@@ -25,18 +24,14 @@ export const MiniStreetView: React.FC<MiniStreetViewProps> = ({
   // Generate placeholder image
   const placeholderUrl = `https://via.placeholder.com/${width}x${height}/e0e0e0/808080?text=${encodeURIComponent(address ? address.substring(0, 20) : "No Address")}`;
 
-  // Show placeholder image by default
-  const apiKey = GOOGLE_STREET_VIEW_API_KEY;
-  const hasApiKey = apiKey && apiKey.length > 5;
+  const hasApiKey = GOOGLE_STREET_VIEW_API_KEY && GOOGLE_STREET_VIEW_API_KEY.length > 0;
   
-  // Only try to use the Google API if a key is actually set
   let streetViewUrl = placeholderUrl;
   if (hasApiKey && address) {
-    // Encode URI and build image URL
     const params = new URLSearchParams({
       size: `${width}x${height}`,
       location: address,
-      key: apiKey,
+      key: GOOGLE_STREET_VIEW_API_KEY,
       pitch: "10",
       fov: "80",
       heading: "235"

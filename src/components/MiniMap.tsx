@@ -47,6 +47,8 @@ export const MiniMap: React.FC<MiniMapProps> = ({
         whenReady={(map) => {
           map.target.scrollWheelZoom.disable();
         }}
+        attributionControl={false}
+        zoomControl={false}
       >
         <SetViewOnLoad coords={position} zoom={zoom} />
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
