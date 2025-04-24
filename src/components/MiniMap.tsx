@@ -1,9 +1,7 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-
-// Avoid missing marker icon issue in leaflet/react-leaflet
 import L from "leaflet";
 
 // Fix for default marker icon issue in Leaflet
@@ -14,7 +12,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-// Helper component to set view since center prop is not available directly
 const SetViewOnLoad = ({ coords, zoom }: { coords: [number, number], zoom: number }) => {
   const map = useMap();
   useEffect(() => {
@@ -40,24 +37,19 @@ export const MiniMap: React.FC<MiniMapProps> = ({
 }) => {
   if (!lat || !lon) return null;
   
-  // Define the position for the map and marker
   const position: [number, number] = [lat, lon];
 
   return (
     <div className="rounded-lg shadow border overflow-hidden" style={{ height }}>
       <MapContainer
         className="h-full w-full"
-        attributionControl={false}
-        zoomControl={false}
-        whenCreated={(map) => {
-          map.scrollWheelZoom.disable();
-        }}
         style={{ height: "100%", width: "100%" }}
+        whenReady={(map) => {
+          map.target.scrollWheelZoom.disable();
+        }}
       >
         <SetViewOnLoad coords={position} zoom={zoom} />
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <Marker position={position}>
           {label && <Popup>{label}</Popup>}
         </Marker>

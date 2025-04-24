@@ -27,11 +27,11 @@ export const MiniStreetView: React.FC<MiniStreetViewProps> = ({
 
   // Show placeholder image by default
   const apiKey = GOOGLE_STREET_VIEW_API_KEY;
-  const isApiKeyAvailable = apiKey && apiKey.length > 5;
+  const hasApiKey = apiKey && apiKey.length > 5;
   
   // Only try to use the Google API if a key is actually set
   let streetViewUrl = placeholderUrl;
-  if (isApiKeyAvailable && address) {
+  if (hasApiKey && address) {
     // Encode URI and build image URL
     const params = new URLSearchParams({
       size: `${width}x${height}`,
@@ -56,7 +56,7 @@ export const MiniStreetView: React.FC<MiniStreetViewProps> = ({
       style={{ height, width }}
       onClick={handleClick}
     >
-      {isApiKeyAvailable && address ? (
+      {hasApiKey && address ? (
         <img
           src={streetViewUrl}
           alt="Street view"
@@ -74,8 +74,10 @@ export const MiniStreetView: React.FC<MiniStreetViewProps> = ({
           >
             {address ? address.substring(0, 20) + (address.length > 20 ? "..." : "") : clickToAdd ? "Click to add address" : "No address"}
           </div>
-          {isApiKeyAvailable === false && (
-            <span className="text-[8px] text-gray-400 mt-1">{clickToAdd ? "Setup your property" : "Set API key for Street View"}</span>
+          {!hasApiKey && (
+            <span className="text-[8px] text-gray-400 mt-1">
+              {clickToAdd ? "Setup your property" : "Set API key for Street View"}
+            </span>
           )}
         </div>
       )}
